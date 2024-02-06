@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  (c) Copyright 2020 Micro Focus or one of its affiliates, a Micro Focus company
+  
+  Permission is hereby granted, free of charge, to any person obtaining a 
+  copy of this software and associated documentation files (the 
+  "Software"), to deal in the Software without restriction, including without 
+  limitation the rights to use, copy, modify, merge, publish, distribute, 
+  sublicense, and/or sell copies of the Software, and to permit persons to 
+  whom the Software is furnished to do so, subject to the following 
+  conditions:
+  
+  The above copyright notice and this permission notice shall be included 
+  in all copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY 
+  KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
+  WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
+  PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, 
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF 
+  CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS 
+  IN THE SOFTWARE.
+-->
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:lang="http://www.springframework.org/schema/lang" xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.2.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.2.xsd
+		http://www.springframework.org/schema/lang http://www.springframework.org/schema/lang/spring-lang-4.2.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.2.xsd">
+		
+	<!--
+		This configuration file contains a basic configuration for submitting vulnerabilities
+		from SSC to Azure DevOps, and does not describe all possible configuration options. Please 
+		see FortifyBugTrackerUtility documentation for more information about the various 
+		configuration components and properties. 
+	 -->	
+	
+	<context:component-scan base-package="com.fortify.bugtracker.src.ssc, com.fortify.bugtracker.tgt.ado"/>
+	
+	<bean class="com.fortify.bugtracker.src.ssc.config.SSCSourceApplicationVersionsConfiguration">
+		<property name="attributeToCLIOptionMap"><map>
+			<entry key="ADO Project" value="ADOProject"/>
+		</map></property>
+	</bean>	
+	
+	<bean class="com.fortify.bugtracker.src.ssc.config.SSCSourceVulnerabilitiesConfiguration">
+		<property name="filterStringForVulnerabilitiesToBeSubmitted" value="analysis:exploitable"/>
+		<property name="bugLinkCustomTagName" value="ADOBugLink"/> <!-- You may need to rename any existing TFSBugLink custom tag -->
+		
+		<property name="extraCustomTags"><map>
+			<entry key="ADOIssueState" value="${fields['System.State']}"/> <!-- You may need to rename any existing TFSIssueState custom tag -->
+		</map></property>
+	</bean>
+
+	<bean class="com.fortify.bugtracker.tgt.ado.config.ADOTargetConfiguration">
+		<!-- Note that work item type 'Bug' is not available in all Azure DevOps work item processes. -->
+		<!-- When changing the work item type, you may also need to update the name of the field where the
+		     description is stored, as 'Microsoft.VSTS.TCM.ReproSteps' may not be available or visible for
+		     other work item types. For example, for work item type 'Task' you may want to use 'System.Description'
+		     instead. Note that you will need to change the field name in both the 'fields' and 'appendedFields'
+		     properties. -->
+		<property name="workItemType" value="Bug"/>
+		
+		<property name="groupTemplateExpression" value="${issueName}+${fullFileName}"/>
+		
+		<property name="fields"><map>
+			<entry key="System.Title" value="SSC Detected ${issueName} at ${fullFileName}"/>
+			<entry key="Microsoft.VSTS.Common.Severity" value="${{'Critical':'1 - Critical','High':'2 - High','Medium':'3 - Medium','Low':'4 - Low'}.get(friority)}"/>
+			<entry key="Microsoft.VSTS.TCM.ReproSteps" value="--- Changes to the description will be overwritten when FortifyBugTrackerUtility updates issue states ---\n\n&lt;br/&gt;Category: ${issueName} at ${fullFileName}"/>
+		</map></property>
+
+		<property name="appendedFields"><map>
+			<!--  Append individual issue data to the given field. 
+			      Note that the same field must exist in the fields property above -->
+			<entry key="Microsoft.VSTS.TCM.ReproSteps"><value><![CDATA[
+				<br/>\n<br/>\nId: ${id}<br/>\nState: ${vulnState}<br/>\nLine: ${lineNumber?:'Unknown'}<br/>\nLink: <a href="${deepLink}">${deepLink}</a>
+			]]></value></entry>
+		</map></property>
+		
+		<property name="fieldsToUpdateDuringStateManagement" value="Microsoft.VSTS.TCM.ReproSteps"/>
+	
+		<!-- These transitions are based on Azure DevOps Agile work item process, covering work item types 
+		     Bug, Issue and Task. You may need to update these when using a different work item process or 
+		     work item type. -->
+		<property name="transitionsForOpeningIssue"><map>
+			<entry key="fields['System.WorkItemType']=='Bug' and fields['System.State'] matches 'Resolved|Closed'" 
+			       value="Active[Issue re-opened by FortifyBugTrackerUtility]" />
+			<entry key="fields['System.WorkItemType']=='Issue' and fields['System.State'] matches 'Closed'" 
+			       value="Active[Issue re-opened by FortifyBugTrackerUtility]" />
+			<entry key="fields['System.WorkItemType']=='Task' and fields['System.State'] matches 'Closed|Removed'" 
+			       value="Active[Issue re-opened by FortifyBugTrackerUtility]" />
+		</map></property>
+		<property name="transitionsForClosingIssue"><map>
+			<entry key="fields['System.WorkItemType']=='Bug' and fields['System.State'] matches 'New|Active'" 
+			       value="Resolved[Issue closed by FortifyBugTrackerUtility]" />
+			<entry key="fields['System.WorkItemType']=='Issue' and fields['System.State'] matches 'Active'" 
+			       value="Closed[Issue closed by FortifyBugTrackerUtility]" />
+			<entry key="fields['System.WorkItemType']=='Task' and fields['System.State'] matches 'New|Active'" 
+			       value="Closed[Issue closed by FortifyBugTrackerUtility]" />
+		</map></property>
+	</bean>
+
+	
+</beans>
