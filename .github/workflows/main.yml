@@ -37,4 +37,4 @@ jobs:
           FBTU_JIRAUSERNAME: ${{ secrets.FBTU_JIRAUSERNAME }}
           FBTU_JIRAPASSWORD: ${{ secrets.FBTU_JIRAPASSWORD }}
           FBTU_JIRAPROJECTKEY: ${{ secrets.FBTU_JIRAPROJECTKEY }}
-        run: java -jar FortifyBugTrackerUtility-4.12.jar -configFile "FoDToJira.xml" -FoDBaseUrl "https://ams.fortify.com/" -FoDTenant "setenant" -FoDUserName "$FBTU_FODUSERNAME" -FoDPassword "$FBTU_FODPASSWORD" -FoDReleaseId "853964" --JiraBaseUrl "$FBTU_JIRABASEURL" -JiraUserName "$FBTU_JIRAUSERNAME" -JiraPassword "$FBTU_JIRAPASSWORD" -JiraProjectKey "$FBTU_JIRAPROJECTKEY"
+        run: java -jar FortifyBugTrackerUtility-4.12.jar -configFile "FoDToJiraWithParents.xml" -FoDBaseUrl "https://ams.fortify.com/" -FoDTenant "setenant" -FoDUserName "$FBTU_FODUSERNAME" -FoDPassword "$FBTU_FODPASSWORD" -FoDReleaseId "853964" --JiraBaseUrl "$FBTU_JIRABASEURL" -JiraUserName "$FBTU_JIRAUSERNAME" -JiraPassword "$FBTU_JIRAPASSWORD" -JiraProjectKey "$FBTU_JIRAPROJECTKEY"
