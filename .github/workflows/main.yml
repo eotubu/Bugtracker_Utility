@@ -1,0 +1,40 @@
+name: Create Jira Bug Ticket from Fortify on Demand
+
+# TODO: Customize trigger events based on your DevSecOps processes and typical FoD SAST scan time
+on:
+  push:
+    branches: ["master"]
+  schedule:
+    - cron: '28 2 * * 0'
+  workflow_dispatch:  
+
+jobs:
+  Bugtracker:
+    # Use the appropriate runner for building your source code.
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      # Check out source code
+      - name: Check Out Source Code
+        uses: actions/checkout@v3
+
+      # Java is required to run the various Fortify utilities.
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: 11
+          distribution: 'zulu'
+
+      - name: Run Bug trackeer Utility
+        env:
+          FBTU_FODUSERNAME: ${{ secrets.FBTU_FODUSERNAME }}
+          FBTU_FODPASSWORD: ${{ secrets.FBTU_FODPASSWORD }}
+          FBTU_JIRABASEURL: ${{ secrets.FBTU_JIRABASEURL }}
+          FBTU_JIRAUSERNAME: ${{ secrets.FBTU_JIRAUSERNAME }}
+          FBTU_JIRAPASSWORD: ${{ secrets.FBTU_JIRAPASSWORD }}
+          FBTU_JIRAPROJECTKEY: ${{ secrets.FBTU_JIRAPROJECTKEY }}
+        run: java -jar FortifyBugTrackerUtility-4.12.jar -configFile "FoDToJiraWithParents.xml" -FoDBaseUrl "https://ams.fortify.com/" -FoDTenant "setenant" -FoDUserName "$FBTU_FODUSERNAME" -FoDPassword "$FBTU_FODPASSWORD" -FoDReleaseId "853964" --JiraBaseUrl $FBTU_JIRABASEURL -JiraUserName $FBTU_JIRAUSERNAME -JiraPassword $FBTU_JIRAPASSWORD -JiraProjectKey $FBTU_JIRAPROJECTKEY
